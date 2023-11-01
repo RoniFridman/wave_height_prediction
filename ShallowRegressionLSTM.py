@@ -28,13 +28,13 @@ class ShallowRegressionLSTM(nn.Module):
 
         return out
 
-    def train_model(self, model, data_loader, loss_function, optimizer):
+    def train_model(self, data_loader, loss_function, optimizer):
         num_batches = len(data_loader)
         total_loss = 0
-        model.train()
+        self.train()
 
         for i, (X, y) in enumerate(data_loader):
-            output = model(X)
+            output = self(X)
             loss = loss_function(output, y)
 
             optimizer.zero_grad()
@@ -43,7 +43,7 @@ class ShallowRegressionLSTM(nn.Module):
             total_loss += loss.item()
         avg_loss = total_loss / num_batches
         print(f"Train loss: {avg_loss}")
-        return model
+        return self, avg_loss
 
     def test_model(self, data_loader, loss_function):
         num_batches = len(data_loader)
@@ -55,6 +55,7 @@ class ShallowRegressionLSTM(nn.Module):
                 total_loss += loss_function(output, y).item()
         avg_loss = total_loss / num_batches
         print(f"\nTest loss: {avg_loss}")
+        return avg_loss
 
     def predict(model, data_loader):
         output = torch.tensor([])

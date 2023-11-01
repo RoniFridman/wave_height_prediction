@@ -7,6 +7,7 @@ from SequenceDataset import SequenceDataset
 from torch.utils.data import DataLoader
 import tqdm
 from utils import *
+from matplotlib import pyplot as plt
 
 torch.manual_seed(99)
 
@@ -14,12 +15,12 @@ torch.manual_seed(99)
 class LSTMDataManager:
     def __init__(self, full_data_path):
         self.full_data_path = full_data_path
-        self.learning_rate = 5e-4
+        self.learning_rate = 1e-5
         self.num_hidden_units = 16
         self.train_test_ratio = 0.8  # train is 90%
-        self.epochs = 5
+        self.epochs = 30
         self.batch_size = 4
-        self.seq_length = 100
+        self.seq_length = 200
         self.target_variable = 'hs'
         self.output_path = "./outputs"
         self.forcast_lead_hours = 48
@@ -38,12 +39,12 @@ class LSTMDataManager:
         self.target_mean = 0
         self.target_std = 0
 
-    def build_new_model(self, csv_path):
+    def build_new_model(self):
         # Load data
         print(f"###########\t\tCreating model for forcast lead:  {self.forcast_lead_hours}")
 
         forecast_lead = self.forcast_lead_hours * 2  # Since rows are for each 30 min, not 1 hour.
-        full_data_df, self.features, new_target = load_data(csv_path=csv_path,
+        full_data_df, self.features, new_target = load_data(csv_path=self.full_data_path,
                                                             forecast_lead=forecast_lead,
                                                             target_variable=self.target_variable)
         df_train, df_test = train_test_split(full_data_df, ratio=self.train_test_ratio)
@@ -75,8 +76,8 @@ class LSTMDataManager:
         pred_value_col_name = "Model forecast"
 
         df_train, df_test = self.train_loader.dataset.df, self.test_loader.dataset.df
-        df_train[pred_value_col_name] = self.model.predict(self.model, self.train_eval_loader).numpy()
-        df_test[pred_value_col_name] = self.model.predict(self.model, self.test_loader).numpy()
+        df_train[pred_value_col_name] = self.model.predict( self.train_eval_loader).numpy()
+        df_test[pred_value_col_name] = self.model.predict(self.test_loader).numpy()
 
         df_out = pd.concat((df_train, df_test))[[self.target_variable, pred_value_col_name]]
 
@@ -105,9 +106,18 @@ class LSTMDataManager:
 
     def train_lstm(self):
         print("Untrained test\n--------")
-        self.model.test_model(self.model, self.test_loader, self.loss_function)
+        self.model.test_model(self.test_loader, self.loss_function)
+        train_loss = []
+        test_loss = []
         for ix_epoch in tqdm.tqdm(range(self.epochs)):
             print(f"Epoch {ix_epoch}\n---------")
-            self.model = self.model.train_model(self.model, self.train_loader, self.loss_function, self.optimizer)
-            self.model.test_model(self.model, self.test_loader, self.loss_function)
+            self.model, loss = self.model.train_model(self.train_loader, self.loss_function, self.optimizer)
+            train_loss.append(loss)
+            test_loss.append(self.model.test_model(self.test_loader, self.loss_function))
+
+        plt.plot([[x,y] for x,y in enumerate(train_loss)])
+        plt.title("Train Loss")
+        plt.plot([[x, y] for x, y in enumerate(test_loss)])
+        plt.title("Test Loss")
+        plt.show()
         torch.save(self.model, self.model_path)

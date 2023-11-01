@@ -2,14 +2,13 @@ import torch
 from torch.utils.data import Dataset
 
 class SequenceDataset(Dataset):
-    def __init__(self, dataframe, target, features, sequence_length, target_mean, target_stdv):
+    def __init__(self, dataframe, target, features, sequence_length):
         self.df = dataframe
         self.features = features
         self.target = target
         self.sequence_length = sequence_length
         self.y = torch.tensor(dataframe[target].values).float()
         self.X = torch.tensor(dataframe[features].values).float()
-        self.target_variable_mean_stdv = (target_mean, target_stdv)
 
     def __len__(self):
         return self.X.shape[0]

@@ -27,3 +27,41 @@ class ShallowRegressionLSTM(nn.Module):
         out = self.linear(hn[0]).flatten()  # First dim of Hn is num_layers, which is set to 1 above.
 
         return out
+
+    def train_model(self, model, data_loader, loss_function, optimizer):
+        num_batches = len(data_loader)
+        total_loss = 0
+        model.train()
+
+        for i, (X, y) in enumerate(data_loader):
+            output = model(X)
+            loss = loss_function(output, y)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+        avg_loss = total_loss / num_batches
+        print(f"Train loss: {avg_loss}")
+        return model
+
+    def test_model(self, data_loader, loss_function):
+        num_batches = len(data_loader)
+        total_loss = 0
+        self.eval()
+        with torch.no_grad():
+            for X, y in data_loader:
+                output = self(X)
+                total_loss += loss_function(output, y).item()
+        avg_loss = total_loss / num_batches
+        print(f"\nTest loss: {avg_loss}")
+
+    def predict(model, data_loader):
+        output = torch.tensor([])
+        model.eval()
+        with torch.no_grad():
+            for i, (X, _) in enumerate(data_loader):
+                y_star = model(X)
+                output = torch.cat((output, y_star), 0)
+
+        return output

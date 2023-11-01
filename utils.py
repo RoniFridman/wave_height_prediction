@@ -35,14 +35,14 @@ def load_model_and_loaders(model_path, train_loader_path, test_loader_path, trai
 def load_data(csv_path, forecast_lead=4, target_variable='hs'):
     data = pd.read_csv(csv_path, index_col='datetime')
     features = list(data.columns.difference([target_variable]))
-    target = f"{target_variable}_lead{forecast_lead}"
+    new_target_col_name = f"{target_variable}_lead{forecast_lead}"
     for column in features:
         data[column].fillna(data[column].mean(), inplace=True)
 
-    data[target] = data[target_variable].shift(-forecast_lead)
+    data[new_target_col_name] = data[target_variable].shift(-forecast_lead)
     data = data.iloc[:-forecast_lead]
 
-    return data, features, target_variable, target
+    return data, features, new_target_col_name
 
 
 def train_test_split(data, ratio=0.7, test_start_ts=None):
@@ -57,24 +57,32 @@ def train_test_split(data, ratio=0.7, test_start_ts=None):
     return df_train, df_test
 
 
-def normalize_features_and_target(df_train, df_test, target):
-    target_mean = df_train[target].mean()
-    target_stdv = df_train[target].std()
+def normalize_features_and_target(df_train, df_test, target, predict_only=False):
+    if predict_only:
+        target_mean = df_test[target].mean()
+        target_stdv = df_test[target].std()
 
-    for c in df_train.columns:
-        mean = df_train[c].mean()
-        stdev = df_train[c].std()
-
-        df_train[c] = (df_train[c] - mean) / stdev
-        df_test[c] = (df_test[c] - mean) / stdev
-    return df_train, df_test, target_mean, target_stdv
-
-
-def configure_model(features, learning_rate, num_hidden_units, model_path=None):
-    if model_path is not None:
-        model = torch.load("./sr_lstm_model.pth")
+        for c in df_test.columns:
+            mean = df_test[c].mean()
+            stdev = df_test[c].std()
+            df_test[c] = (df_test[c] - mean) / stdev
+        return df_test, target_mean, target_stdv
     else:
-        model = ShallowRegressionLSTM(num_sensors=len(features), hidden_units=num_hidden_units)
+
+        target_mean = df_train[target].mean()
+        target_stdv = df_train[target].std()
+
+        for c in df_train.columns:
+            mean = df_train[c].mean()
+            stdev = df_train[c].std()
+
+            df_train[c] = (df_train[c] - mean) / stdev
+            df_test[c] = (df_test[c] - mean) / stdev
+        return df_train, df_test, target_mean, target_stdv
+
+
+def configure_new_model(features, learning_rate, num_hidden_units):
+    model = ShallowRegressionLSTM(num_sensors=len(features), hidden_units=num_hidden_units)
     loss_function = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     return model, loss_function, optimizer

@@ -1,19 +1,21 @@
+import tqdm
 from torch import nn
 import torch
 
 
 class ShallowRegressionLSTM(nn.Module):
-    def __init__(self, num_sensors, hidden_units):
+    def __init__(self, num_sensors, hidden_units,num_layers):
         super().__init__()
         self.num_sensors = num_sensors  # this is the number of features
         self.hidden_units = hidden_units
-        self.num_layers = 1
+        self.num_layers = num_layers
 
         self.lstm = nn.LSTM(
             input_size=num_sensors,
             hidden_size=hidden_units,
             batch_first=True,
-            num_layers=self.num_layers
+            num_layers=self.num_layers,
+            dropout=0.2
         )
 
         self.linear = nn.Linear(in_features=self.hidden_units, out_features=1)
@@ -28,12 +30,13 @@ class ShallowRegressionLSTM(nn.Module):
 
         return out
 
-    def train_model(self, data_loader, loss_function, optimizer):
+    def train_epoch(self, data_loader, loss_function, optimizer):
         num_batches = len(data_loader)
         total_loss = 0
         self.train()
 
-        for i, (X, y) in enumerate(data_loader):
+        # for i, (X, y) in enumerate(data_loader):
+        for i, (X, y) in tqdm.tqdm(enumerate(data_loader), total=len(data_loader), mininterval=10):
             output = self(X)
             loss = loss_function(output, y)
 

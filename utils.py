@@ -3,11 +3,12 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from sklearn.preprocessing import MinMaxScaler
+import scipy
 from ShallowRegressionLSTM import ShallowRegressionLSTM
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
+
 pio.templates.default = "plotly_white"
 
 
@@ -32,15 +33,27 @@ def load_model_and_loaders(model_path, train_loader_path, test_loader_path, trai
     return model, train_loader, test_loader, train_eval_loader
 
 
-def load_data(csv_path, forecast_lead=4, target_variable='hs'):
+def load_data(csv_path, features_mask='all', forecast_lead=4, target_variable='hs', new_data=False):
     data = pd.read_csv(csv_path, index_col='datetime')
+    data['direction_x'] = data['direction'].apply(lambda x: np.cos(x/360))
+    data['direction_y'] = data['direction'].apply(lambda x: np.sin(x/360))
+    data.drop(columns=['direction'], inplace=True)
+    if features_mask != 'all':
+        features_mask = list(features_mask) + [target_variable]
+        data = data.loc[:, features_mask]
     features = list(data.columns.difference([target_variable]))
     new_target_col_name = f"{target_variable}_lead{forecast_lead}"
-    for column in features:
-        data[column].fillna(data[column].mean(), inplace=True)
 
-    data[new_target_col_name] = data[target_variable].shift(-forecast_lead)
-    data = data.iloc[:-forecast_lead]
+    if not new_data:
+        data[new_target_col_name] = data[target_variable].shift(-forecast_lead)
+        data = data.iloc[:-forecast_lead]
+
+    for column in features:
+        iqr = scipy.stats.iqr(data[column])
+        median = np.median(data[column])
+        lb, ub = median - iqr, median + iqr
+        data.loc[(data[column] < lb) | (data[column] > ub),column] = np.nan
+        data[column].interpolate(inplace=True)
 
     return data, features, new_target_col_name
 
@@ -57,32 +70,8 @@ def train_test_split(data, ratio=0.7, test_start_ts=None):
     return df_train, df_test
 
 
-def normalize_features_and_target(df_train, df_test, target, predict_only=False):
-    if predict_only:
-        target_mean = df_test[target].mean()
-        target_stdv = df_test[target].std()
-
-        for c in df_test.columns:
-            mean = df_test[c].mean()
-            stdev = df_test[c].std()
-            df_test[c] = (df_test[c] - mean) / stdev
-        return df_test, target_mean, target_stdv
-    else:
-
-        target_mean = df_train[target].mean()
-        target_stdv = df_train[target].std()
-
-        for c in df_train.columns:
-            mean = df_train[c].mean()
-            stdev = df_train[c].std()
-
-            df_train[c] = (df_train[c] - mean) / stdev
-            df_test[c] = (df_test[c] - mean) / stdev
-        return df_train, df_test, target_mean, target_stdv
-
-
-def configure_new_model(features, learning_rate, num_hidden_units):
-    model = ShallowRegressionLSTM(num_sensors=len(features), hidden_units=num_hidden_units)
+def configure_new_model(features, learning_rate, num_hidden_units,num_layers):
+    model = ShallowRegressionLSTM(num_sensors=len(features), hidden_units=num_hidden_units,num_layers=num_layers)
     loss_function = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     return model, loss_function, optimizer
@@ -91,6 +80,7 @@ def configure_new_model(features, learning_rate, num_hidden_units):
 def load_model(model_path='./lstm_model.pth'):
     model = torch.load(model_path)
     return model
+
 
 def plot_predictions(df_out, test_start, target_variable: str):
     plot_template = dict(

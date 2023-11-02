@@ -15,12 +15,12 @@ class LSTMDataManager:
     def __init__(self, full_data_path):
         self.full_data_path = full_data_path
         self.forcast_lead_hours = 48
-        self.learning_rate = 1e-6
+        self.learning_rate = 1e-5
         self.num_layers = 3
-        self.num_hidden_units = 12
+        self.num_hidden_units = 30
         self.train_test_ratio = 0.7
         self.epochs = 5
-        self.batch_size = 7
+        self.batch_size = 30
         self.seq_length = 2 * self.forcast_lead_hours * 2
         self.target_variable = 'hs'
         self.output_path = "./outputs"

@@ -50,12 +50,14 @@ def load_data(csv_path, features_mask='all', forecast_lead=4, target_variable='h
         data = data.iloc[:-forecast_lead]
     else:
         data[new_target_col_name] = data[target_variable].shift(-forecast_lead)
+
     for column in features + [new_target_col_name]:
         iqr = scipy.stats.iqr(data[column], nan_policy='omit')
         q1,q3 = np.quantile(data[column],0.25), np.quantile(data[column],0.75)
-        lb, ub = q1 - 1.5*iqr, q3 + 1.5*iqr
+        lb, ub = q1 - 2*iqr, q3 + 2*iqr
         data.loc[(data[column] < lb) | (data[column] > ub), column] = np.nan
         data[column].interpolate(inplace=True)
+        data[column].fillna(method='bfill',inplace=True)
     return data, features, new_target_col_name
 
 

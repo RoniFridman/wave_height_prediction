@@ -1,6 +1,7 @@
 import tqdm
 from torch import nn
 import torch
+import numpy as np
 
 
 class ShallowRegressionLSTM(nn.Module):
@@ -15,6 +16,7 @@ class ShallowRegressionLSTM(nn.Module):
             hidden_size=hidden_units,
             batch_first=True,
             num_layers=self.num_layers,
+            # dropout=0.2
         )
 
         self.linear = nn.Linear(in_features=self.hidden_units, out_features=1)
@@ -34,7 +36,6 @@ class ShallowRegressionLSTM(nn.Module):
         total_loss = 0
         self.train()
 
-        # for i, (X, y) in enumerate(data_loader):
         for i, (X, y) in tqdm.tqdm(enumerate(data_loader), total=len(data_loader), mininterval=10):
             output = self(X)
             loss = loss_function(output, y)
@@ -43,6 +44,7 @@ class ShallowRegressionLSTM(nn.Module):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
+
         avg_loss = total_loss / num_batches
         print(f"Train loss: {avg_loss}")
         return self, avg_loss
@@ -59,12 +61,12 @@ class ShallowRegressionLSTM(nn.Module):
         print(f"\nTest loss: {avg_loss}")
         return avg_loss
 
-    def predict(model, data_loader):
+    def predict(self, data_loader):
         output = torch.tensor([])
-        model.eval()
+        self.eval()
         with torch.no_grad():
             for i, (X, _) in enumerate(data_loader):
-                y_star = model(X)
+                y_star = self(X)
                 output = torch.cat((output, y_star), 0)
 
         return output

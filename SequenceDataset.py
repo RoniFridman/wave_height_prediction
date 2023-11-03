@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import Dataset
+import numpy as np
 
 class SequenceDataset(Dataset):
     def __init__(self, dataframe, target, features, sequence_length):

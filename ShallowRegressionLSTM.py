@@ -15,7 +15,6 @@ class ShallowRegressionLSTM(nn.Module):
             hidden_size=hidden_units,
             batch_first=True,
             num_layers=self.num_layers,
-            dropout=0.2
         )
 
         self.linear = nn.Linear(in_features=self.hidden_units, out_features=1)

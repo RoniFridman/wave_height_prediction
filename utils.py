@@ -44,19 +44,18 @@ def load_data(csv_path, features_mask='all', forecast_lead=4, target_variable='h
     features = list(data.columns.difference([target_variable]))
     new_target_col_name = f"{target_variable}_lead{forecast_lead}"
 
-    for column in features:
-        iqr = scipy.stats.iqr(data[column])
-        median = np.median(data[column])
-        lb, ub = median - iqr, median + iqr
-        data.loc[(data[column] < lb) | (data[column] > ub), column] = np.nan
-        data[column].interpolate(inplace=True)
 
     if not new_data:
         data[new_target_col_name] = data[target_variable].shift(-forecast_lead)
         data = data.iloc[:-forecast_lead]
     else:
         data[new_target_col_name] = data[target_variable].shift(-forecast_lead)
-
+    for column in features + [new_target_col_name]:
+        iqr = scipy.stats.iqr(data[column], nan_policy='omit')
+        q1,q3 = np.quantile(data[column],0.25), np.quantile(data[column],0.75)
+        lb, ub = q1 - 1.5*iqr, q3 + 1.5*iqr
+        data.loc[(data[column] < lb) | (data[column] > ub), column] = np.nan
+        data[column].interpolate(inplace=True)
     return data, features, new_target_col_name
 
 

@@ -38,4 +38,5 @@ class SequenceDataset(Dataset):
             self.columns_std = std_dict if self.columns_std == {} else self.columns_std
             for c in self.df.columns:
                 self.df[c] = (self.df[c] - mean_dict[c]) / std_dict[c]
-
+        self.y = torch.tensor(self.df[self.target].values).float()
+        self.X = torch.tensor(self.df[self.features].values).float()

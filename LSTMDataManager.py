@@ -14,13 +14,13 @@ torch.manual_seed(2055)
 class LSTMDataManager:
     def __init__(self, full_data_path):
         self.full_data_path = full_data_path
-        self.forcast_lead_hours = 48
-        self.learning_rate = 1e-5
+        self.forcast_lead_hours = 24
+        self.learning_rate = 1e-6
         self.num_layers = 3
-        self.num_hidden_units = 30
+        self.num_hidden_units = 50
         self.train_test_ratio = 0.7
-        self.epochs = 5
-        self.batch_size = 30
+        self.epochs = 10
+        self.batch_size = 4
         self.seq_length = 2 * self.forcast_lead_hours * 2
         self.target_variable = 'hs'
         self.output_path = "./outputs"
@@ -68,32 +68,31 @@ class LSTMDataManager:
                                                                              self.num_hidden_units,self.num_layers)
         self.train_lstm()
 
-    def run_existing_model(self, is_plot_predictions=False):
-        if None in [self.model, self.train_loader, self.test_loader, self.train_eval_loader]:
-            print("ERROR: one of the files was not found. exiting")
-            print(f"model={self.model}\ntrain_loader={self.train_loader}\ntest_loader={self.test_loader}\n"
-                  f"train_eval_loader={self.train_eval_loader}")
-            return
-        pred_value_col_name = "Model forecast"
-
-        df_train, df_test = self.train_loader.dataset.df, self.test_loader.dataset.df
-        columns_mean = self.train_loader.dataset.columns_mean
-        columns_std = self.train_loader.dataset.columns_std
-
-        df_train[pred_value_col_name] = self.model.predict(self.train_eval_loader).numpy()
-        df_test[pred_value_col_name] = self.model.predict(self.test_loader).numpy()
-
-        df_out = pd.concat((df_train, df_test))[[self.target_variable, pred_value_col_name]]
-
-        for c in df_out.columns:
-            df_out[c] = df_out[c] * columns_std[c] + columns_mean[c]
-
-        df_out.to_csv(f"{self.output_path}/predictions_output_{self.forcast_lead_hours}h.csv")
-        if is_plot_predictions:
-            plot_predictions(df_out, df_test.index[0], self.target_variable)
+    # def run_existing_model(self, is_plot_predictions=False):
+    #     if None in [self.model, self.train_loader, self.test_loader, self.train_eval_loader]:
+    #         print("ERROR: one of the files was not found. exiting")
+    #         print(f"model={self.model}\ntrain_loader={self.train_loader}\ntest_loader={self.test_loader}\n"
+    #               f"train_eval_loader={self.train_eval_loader}")
+    #         return
+    #     pred_value_col_name = "Model forecast"
+    #
+    #     df_train, df_test = self.train_loader.dataset.df, self.test_loader.dataset.df
+    #     columns_mean = self.train_loader.dataset.columns_mean
+    #     columns_std = self.train_loader.dataset.columns_std
+    #
+    #     df_train[pred_value_col_name] = self.model.predict(self.train_eval_loader).numpy()
+    #     df_test[pred_value_col_name] = self.model.predict(self.test_loader).numpy()
+    #
+    #     df_out = pd.concat((df_train, df_test))[[self.target_variable, pred_value_col_name]]
+    #
+    #     for c in df_out.columns:
+    #         df_out[c] = df_out[c] * columns_std[c] + columns_mean[c]
+    #
+    #     df_out.to_csv(f"{self.output_path}/predictions_output_{self.forcast_lead_hours}h.csv")
+    #     if is_plot_predictions:
+    #         plot_predictions(df_out, df_test.index[0], self.target_variable)
 
     def predict_on_new_data_csv(self, data_to_predict_csv_path, is_plot_predictions=False):
-
         train_loader = self.train_loader
         mean_std_dicts = (train_loader.dataset.columns_mean, train_loader.dataset.columns_std)
         target_mean, target_std = mean_std_dicts[0][self.target_variable], mean_std_dicts[1][self.target_variable]
@@ -124,8 +123,8 @@ class LSTMDataManager:
         predicted_values_only.to_csv(f"{self.output_path}/new_data_predictions_forcast_only.csv", index=False)
         # compare wuth real results
         empirical_measurments_path = r".\outputs\new_data_real_measurments.csv"
-        empirical_measurments = pd.read_csv(empirical_measurments_path, index_col="datetime")
-        empirical_measurments[predictions_column_name] = predicted_values_only.loc[:len(empirical_measurments)-1][predictions_column_name].values
+        empirical_measurments = pd.read_csv(empirical_measurments_path, index_col="datetime")[:len(predicted_values_only)]
+        empirical_measurments[predictions_column_name] = predicted_values_only.loc[:len(empirical_measurments)][predictions_column_name].values
         f, ax = plt.subplots(1, 1)
         ax.plot(range(len(empirical_measurments)), empirical_measurments[predictions_column_name])
         ax.plot(range(len(empirical_measurments)), empirical_measurments[self.target_variable])

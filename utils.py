@@ -1,3 +1,5 @@
+import os.path
+
 import numpy as np
 import pandas as pd
 import torch
@@ -33,8 +35,9 @@ def load_model_and_loaders(model_path, train_loader_path, test_loader_path, trai
     return model, train_loader, test_loader, train_eval_loader
 
 
-def load_data(csv_path, features_mask='all', forecast_lead=4, target_variable='hs', new_data=False):
-    data = pd.read_csv(csv_path, index_col='datetime')
+def load_data(data, features_mask='all', forecast_lead=4, target_variable='hs', new_data=False):
+    if isinstance(data,str):
+        data = pd.read_csv(data, index_col='datetime')
     data['direction_x'] = data['direction'].apply(lambda x: np.cos(x/360))
     data['direction_y'] = data['direction'].apply(lambda x: np.sin(x/360))
     data.drop(columns=['direction'], inplace=True)
@@ -80,12 +83,14 @@ def configure_new_model(features, learning_rate, num_hidden_units,num_layers):
     return model, loss_function, optimizer
 
 
-def load_model(model_path='./lstm_model.pth'):
-    model = torch.load(model_path)
-    return model
+def create_short_data_csv(full_csv_path, new_data_training_path, empirical_test_data_path, forecast, seq_number):
+    data = pd.DataFrame(pd.read_csv(full_csv_path).iloc[-53000:]).set_index('datetime')
+    data[-1*forecast*seq_number:-1 * forecast].to_csv(new_data_training_path)
+    data[-1 * forecast:].to_csv(empirical_test_data_path)
+    return data
 
 
-def plot_predictions(df_out, test_start, target_variable: str):
+def plot_predictions(df_out, test_start, target_variable: str, images_output_path):
     plot_template = dict(
         layout=go.Layout({
             "font_size": 18,
@@ -98,4 +103,5 @@ def plot_predictions(df_out, test_start, target_variable: str):
     fig.update_layout(
         template=plot_template, legend=dict(orientation='h', y=1.02, title_text="")
     )
+    fig.write_image(os.path.join(images_output_path), "train_test_predictions.png")
     fig.show()

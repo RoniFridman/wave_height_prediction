@@ -83,10 +83,16 @@ def configure_new_model(features, learning_rate, num_hidden_units,num_layers):
     return model, loss_function, optimizer
 
 
-def create_short_data_csv(full_csv_path, new_data_training_path, empirical_test_data_path, forecast, seq_number):
-    data = pd.DataFrame(pd.read_csv(full_csv_path).iloc[-53000:]).set_index('datetime')
+def create_short_data_csv(full_csv_path, new_data_training_path, empirical_test_data_path,
+                          forecast, seq_number, predict_latest=False):
+    if predict_latest:
+        data = pd.read_csv(full_csv_path).set_index('datetime').iloc[-1 * forecast * seq_number:]
+        return data
+
+    data = pd.read_csv(full_csv_path).set_index('datetime').iloc[-53000:]
     data[-1*forecast*seq_number:-1 * forecast].to_csv(new_data_training_path)
     data[-1 * forecast:].to_csv(empirical_test_data_path)
+    data = data.iloc[:-1*forecast]
     return data
 
 

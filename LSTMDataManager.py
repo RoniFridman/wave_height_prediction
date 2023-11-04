@@ -39,14 +39,14 @@ class LSTMDataManager:
         os.makedirs(self.csv_output_path, exist_ok=True)
 
         # Models parameters
-        self.years_of_data_to_use = 2
+        self.years_of_data_to_use = 3
         self.learning_rate = 1e-4
-        self.num_layers = 1
-        self.num_hidden_units = 512
+        self.num_layers = 3
+        self.num_hidden_units = 128
         self.train_test_ratio = 0.8
         self.epochs = 50
-        self.batch_size = 10
-        self.seq_length = self.forecast_lead_hours
+        self.batch_size = 4
+        self.seq_length = self.forecast_lead_hours // 2
         self.loss_function = None
         self.optimizer = None
         self.features = None
@@ -155,7 +155,7 @@ class LSTMDataManager:
         predicted_values_only = predicted_values_only.reset_index()
         predicted_values_only['datetime'] = pd.to_datetime(predicted_values_only['datetime'])
         predicted_values_only['datetime'] = predicted_values_only['datetime'].apply(lambda x: x + relativedelta(
-            hours=self.forecast_lead_hours) - 2)
+            hours=self.forecast_lead_hours-3))
         predicted_values_only.to_csv(f"{self.csv_output_path}/new_data_predictions_forcast_only.csv", index=False)
 
         prediction_df.to_csv(f"{self.csv_output_path}/new_data_predictions_full.csv")
@@ -166,8 +166,10 @@ class LSTMDataManager:
                                 :len(predicted_values_only)]
         empirical_measurments[predictions_column_name] = predicted_values_only.loc[:len(empirical_measurments)][
             predictions_column_name].values
-        plt.plot(range(len(empirical_measurments)), empirical_measurments[predictions_column_name], label="Predictions")
-        plt.plot(range(len(empirical_measurments)), empirical_measurments[self.target_variable], label="Real Data")
+        x_axis_labels = [x.strftime("%d %H:%M") for x in predicted_values_only['datetime']]
+        plt.plot(predicted_values_only['datetime'], empirical_measurments[predictions_column_name], label="Predictions")
+        plt.plot(predicted_values_only['datetime'], empirical_measurments[self.target_variable], label="Real Data")
+        plt.xticks(labels=x_axis_labels, rotation=90, ticks=predicted_values_only['datetime'],)
         plt.title(f'{self.training_counter} : Forecast Predictions vs Real Data epoch {self.training_counter}')
         plt.legend()
         output_image_path = os.path.join(self.images_output_path,

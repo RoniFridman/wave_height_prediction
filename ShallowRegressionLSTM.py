@@ -25,7 +25,11 @@ class ShallowRegressionLSTM(nn.Module):
         h0 = torch.zeros(self.num_layers, batch_size, self.hidden_units).requires_grad_()
         c0 = torch.zeros(self.num_layers, batch_size, self.hidden_units).requires_grad_()
 
-        _, (hn, _) = self.lstm(x, (h0, c0))
+        if 'nan' in [str(float(i)) for i in x.flatten() if str(float(i)) == 'nan']:
+            print("ad")
+            print(x)
+
+        ii, (hn, _) = self.lstm(x, (h0, c0))
         out = self.linear(hn[0]).flatten()  # First dim of Hn is num_layers, which is set to 1 above.
 
         return out
@@ -43,7 +47,8 @@ class ShallowRegressionLSTM(nn.Module):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-
+            if str(total_loss) == 'nan':
+                break
         avg_loss = total_loss / num_batches
         print(f"Train loss: {avg_loss}")
         return self, avg_loss

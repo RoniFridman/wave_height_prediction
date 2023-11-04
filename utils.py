@@ -12,6 +12,10 @@ load_dotenv()
 def load_data(data, features_mask='all', forecast_lead=4, target_variable='hs', new_data=False):
     if isinstance(data, str):
         data = pd.read_csv(data, index_col='datetime')
+    if "id" in data.columns:
+        data.drop(columns=["id"], inplace=True)
+    if "location_id" in data.columns:
+        data.drop(columns=["location_id"],inplace=True)
     data['direction_x'] = data['direction'].apply(lambda x: np.cos(x / 360))
     data['direction_y'] = data['direction'].apply(lambda x: np.sin(x / 360))
     data.drop(columns=['direction'], inplace=True)
@@ -61,8 +65,8 @@ def create_short_data_csv(full_csv_path, new_data_training_path, empirical_test_
     if predict_latest:
         data = pd.read_csv(full_csv_path).set_index('datetime').iloc[-1 * forecast * seq_number:]
         return data
-
-    data = pd.read_csv(full_csv_path).set_index('datetime').iloc[-17520 * years_of_data_to_use:]
+    cutoff_index= round(-17520 * years_of_data_to_use)
+    data = pd.read_csv(full_csv_path).set_index('datetime').iloc[cutoff_index:]
     data[-1 * forecast * seq_number:-1 * forecast].to_csv(new_data_training_path)
     data[-1 * forecast:].to_csv(empirical_test_data_path)
     data = data.iloc[:-1 * forecast]
@@ -114,7 +118,7 @@ def update_latest_data_from_db(full_data_path, location='haifa'):
                                       database=os.getenv('db_name'))
         location_id = {'haifa':1, "ashdod":2}
 
-        command = f"COPY (select datetime,hs,direction,tz,tp,temperature,location_id,h_onethird,hmax,tav " \
+        command = f"COPY (select datetime,hs,direction,tz,tp,temperature,h_onethird,hmax,tav " \
                   f"from backend_buoysmsr where location_id = {location_id[location]} order by datetime) " \
                   f"to STDOUT with CSV delimiter ',' header"
 

@@ -1,7 +1,10 @@
 import copy
+import datetime
 import os.path
 import sys
 from dateutil.relativedelta import relativedelta
+
+import utils
 from SequenceDataset import SequenceDataset
 from torch.utils.data import DataLoader
 import tqdm
@@ -12,50 +15,59 @@ torch.manual_seed(2055)
 
 
 class LSTMDataManager:
-    def __init__(self, full_data_path):
+    def __init__(self, full_data_path, location,target_variable,base_location_folder):
+        # forward time to predict
+        self.target_variable = target_variable
         self.forecast_lead_hours = 24
-        self.full_data_path = full_data_path
+        self.location = location
 
-        self.output_path = f"./outputs/{os.path.basename(full_data_path).split('.')[0]}_{self.forecast_lead_hours}h_forecast"
+        # paths for running on db77
+        self.full_data_path = full_data_path
+        self.output_path = base_location_folder+f"/outputs/{location}_{self.forecast_lead_hours}h_{target_variable}_forecast"
         self.images_output_path = os.path.join(self.output_path, "images")
         self.csv_output_path = os.path.join(self.output_path, "csv files")
+        self.new_data_training_path = f"{self.csv_output_path}\{location}_data_for_{target_variable}_forecast_{self.forecast_lead_hours}h.csv"
+        self.forecast_groundtruth = f"{self.csv_output_path}\{location}_{target_variable}_groundtruth_{self.forecast_lead_hours}h.csv"
+        self.model_path = f"{self.output_path}/{location}_shallow_reg_lstm_{target_variable}_{self.forecast_lead_hours}h.pth"
+        self.train_loader_path = f"{self.output_path}/{location}_train_loader_{self.forecast_lead_hours}h_forecast_{target_variable}.pth"
+        self.test_loader_path = f"{self.output_path}/{location}_test_loader_{self.forecast_lead_hours}h_forecast_{target_variable}.pth"
+        self.train_eval_loader_path = f"{self.output_path}/{location}_train_eval_loader_{self.forecast_lead_hours}h_forecast_{target_variable}.pth"
+
+
+        # Create folders in which to save files
         os.makedirs(self.images_output_path, exist_ok=True)
         os.makedirs(self.csv_output_path, exist_ok=True)
 
-        self.new_data_training_path = f"{self.csv_output_path}\haifa_data_for_forcast_{self.forecast_lead_hours}h.csv"
-        self.forecast_groundtruth = f"{self.csv_output_path}\haifa_groundtruth_{self.forecast_lead_hours}h.csv"
-        # self.learning_rate = 5e-4
+        # Models parameters
+        self.years_of_data_to_use = 2
         self.learning_rate = 1e-4
         self.num_layers = 1
         self.num_hidden_units = 512
         self.train_test_ratio = 0.8
         self.epochs = 50
-        self.batch_size = 4
-        # self.seq_length = self.forcast_lead_hours * 1
-        self.seq_length = self.forecast_lead_hours // 2
-        self.target_variable = 'hs'
+        self.batch_size = 10
+        self.seq_length = self.forecast_lead_hours
+        self.loss_function = None
+        self.optimizer = None
+        self.features = None
 
-
-        self.model_path = f"{self.output_path}/shallow_reg_lstm_{self.forecast_lead_hours}h.pth"
-        self.train_loader_path = f"{self.output_path}/train_loader_{self.forecast_lead_hours}h_forcast.pth"
-        self.test_loader_path = f"{self.output_path}/test_loader_{self.forecast_lead_hours}h_forcast.pth"
-        self.train_eval_loader_path = f"{self.output_path}/train_eval_loader_{self.forecast_lead_hours}h_forcast.pth"
-
+        # Loading existing models and loaders
         self.model = torch.load(self.model_path) if os.path.exists(self.model_path) else None
         self.train_loader = torch.load(self.train_loader_path) if os.path.exists(self.model_path) else None
         self.test_loader = torch.load(self.test_loader_path) if os.path.exists(self.model_path) else None
         self.train_eval_loader = torch.load(self.train_eval_loader_path) if os.path.exists(self.model_path) else None
-        self.loss_function = None
-        self.optimizer = None
-        self.features = None
-        self.training_counter=0
+
+        # Counter for training epochs
+        self.training_counter = 0
 
     def build_new_model(self):
         # Load data
-        print(f"###########\t\tCreating model for forcast lead:  {self.forecast_lead_hours} hours")
+        print(f"###########\t\tCreating model for forecast lead:  {self.forecast_lead_hours} hours")
 
         forecast_lead = self.forecast_lead_hours * 2  # Since rows are for each 30 min, not 1 hour.
-        self.full_data_df = create_short_data_csv(self.full_data_path, self.new_data_training_path, self.forecast_groundtruth, forecast_lead, self.seq_length)
+        self.full_data_df = create_short_data_csv(self.full_data_path, self.new_data_training_path,
+                                                  self.forecast_groundtruth, forecast_lead,
+                                                  self.seq_length, years_of_data_to_use=self.years_of_data_to_use)
         full_data_df, self.features, new_target = load_data(data=self.full_data_df,
                                                             features_mask='all',
                                                             forecast_lead=forecast_lead,
@@ -78,10 +90,10 @@ class LSTMDataManager:
 
         # train model
         self.model, self.loss_function, self.optimizer = configure_new_model(self.features, self.learning_rate,
-                                                                             self.num_hidden_units,self.num_layers)
+                                                                             self.num_hidden_units, self.num_layers)
         self.train_lstm()
 
-    def predict_latest_available_data(self,data_to_predict_csv_path):
+    def predict_latest_available_data(self, location):
         if None in [self.model, self.train_loader, self.test_loader, self.train_eval_loader]:
             print("ERROR: one of the files was not found. exiting")
             print(f"model={self.model}\ntrain_loader={self.train_loader}\ntest_loader={self.test_loader}\n"
@@ -107,32 +119,17 @@ class LSTMDataManager:
         predictions_column_name = f"Predicted_{self.target_variable}"
         prediction_df[predictions_column_name] = self.model.predict(new_loader) * target_std + target_mean
 
-
-
-
-    # def run_existing_model(self, is_plot_predictions=False):
-    #     if None in [self.model, self.train_loader, self.test_loader, self.train_eval_loader]:
-    #         print("ERROR: one of the files was not found. exiting")
-    #         print(f"model={self.model}\ntrain_loader={self.train_loader}\ntest_loader={self.test_loader}\n"
-    #               f"train_eval_loader={self.train_eval_loader}")
-    #         return
-    #     pred_value_col_name = "Model forecast"
-    #
-    #     df_train, df_test = self.train_loader.dataset.df, self.test_loader.dataset.df
-    #     columns_mean = self.train_loader.dataset.columns_mean
-    #     columns_std = self.train_loader.dataset.columns_std
-    #
-    #     df_train[pred_value_col_name] = self.model.predict(self.train_eval_loader).numpy()
-    #     df_test[pred_value_col_name] = self.model.predict(self.test_loader).numpy()
-    #
-    #     df_out = pd.concat((df_train, df_test))[[self.target_variable, pred_value_col_name]]
-    #
-    #     for c in df_out.columns:
-    #         df_out[c] = df_out[c] * columns_std[c] + columns_mean[c]
-    #
-    #     df_out.to_csv(f"{self.output_path}/predictions_output_{self.forcast_lead_hours}h.csv")
-    #     if is_plot_predictions:
-    #         plot_predictions(df_out, df_test.index[0], self.target_variable)
+        prediction_df.index = pd.to_datetime(prediction_df.index)
+        forcast_start_datetime = prediction_df.index[-1 * self.forecast_lead_hours * 2]
+        predicted_values_only = prediction_df.loc[forcast_start_datetime:, predictions_column_name]
+        predicted_values_only = predicted_values_only.reset_index()
+        predicted_values_only['datetime'] = predicted_values_only['datetime'].apply(lambda x: x + relativedelta(
+            hours=self.forecast_lead_hours))
+        forcast_start_datetime_string = forcast_start_datetime.strftime("%Y-%m-%d_%H_%M_%S")
+        predicted_values_only.to_csv(
+            f"{self.csv_output_path}/forcast_{self.forecast_lead_hours}h_start_time_{forcast_start_datetime_string}.csv",
+            index=False)
+        utils.upload_predictions_to_db(predicted_values_only.values,location=location,target_variable=self.target_variable)
 
     def predict_on_new_data_csv(self, data_to_predict_csv_path):
         train_loader = self.train_loader
@@ -142,7 +139,7 @@ class LSTMDataManager:
         # Need to put the new data in a loader.
         prediction_df, _, new_target = load_data(data=data_to_predict_csv_path,
                                                  features_mask=self.features,
-                                                 forecast_lead=self.forcast_lead_hours * 2,
+                                                 forecast_lead=self.forecast_lead_hours * 2,
                                                  target_variable=self.target_variable,
                                                  new_data=True)
         new_dataset = SequenceDataset(prediction_df, new_target, self.features, self.seq_length)
@@ -158,19 +155,23 @@ class LSTMDataManager:
         predicted_values_only = predicted_values_only.reset_index()
         predicted_values_only['datetime'] = pd.to_datetime(predicted_values_only['datetime'])
         predicted_values_only['datetime'] = predicted_values_only['datetime'].apply(lambda x: x + relativedelta(
-            hours=self.forecast_lead_hours))
+            hours=self.forecast_lead_hours) - 2)
+        predicted_values_only.to_csv(f"{self.csv_output_path}/new_data_predictions_forcast_only.csv", index=False)
 
         prediction_df.to_csv(f"{self.csv_output_path}/new_data_predictions_full.csv")
         predicted_values_only.to_csv(f"{self.csv_output_path}/new_data_predictions_forcast_only.csv", index=False)
         # compare with real results
 
-        empirical_measurments = pd.read_csv(self.forecast_groundtruth, index_col="datetime")[:len(predicted_values_only)]
-        empirical_measurments[predictions_column_name] = predicted_values_only.loc[:len(empirical_measurments)][predictions_column_name].values
+        empirical_measurments = pd.read_csv(self.forecast_groundtruth, index_col="datetime")[
+                                :len(predicted_values_only)]
+        empirical_measurments[predictions_column_name] = predicted_values_only.loc[:len(empirical_measurments)][
+            predictions_column_name].values
         plt.plot(range(len(empirical_measurments)), empirical_measurments[predictions_column_name], label="Predictions")
         plt.plot(range(len(empirical_measurments)), empirical_measurments[self.target_variable], label="Real Data")
         plt.title(f'{self.training_counter} : Forecast Predictions vs Real Data epoch {self.training_counter}')
         plt.legend()
-        output_image_path = os.path.join(self.images_output_path, f"forecast_predictions_epoch_{self.training_counter}.png")
+        output_image_path = os.path.join(self.images_output_path,
+                                         f"forecast_predictions_epoch_{self.training_counter}.png")
         plt.savefig(output_image_path)
         plt.close()
 
@@ -190,9 +191,9 @@ class LSTMDataManager:
                 continue
             train_loss.append(train_loss_epoch)
             test_loss.append(test_loss_epoch)
-        plt.plot(range(self.epochs-1), train_loss, label="Train Loss")
-        plt.plot(range(self.epochs-1), test_loss,label="Test Loss")
+        plt.plot(range(self.epochs - 1), train_loss, label="Train Loss")
+        plt.plot(range(self.epochs - 1), test_loss, label="Test Loss")
         plt.title('Train/Test Loss')
         plt.legend()
-        plt.savefig(os.path.join(self.images_output_path,f"loss_graphs.png"))
+        plt.savefig(os.path.join(self.images_output_path, f"loss_graphs.png"))
         plt.close()

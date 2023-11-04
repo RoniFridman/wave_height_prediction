@@ -1,11 +1,10 @@
 import tqdm
 from torch import nn
 import torch
-import numpy as np
 
 
 class ShallowRegressionLSTM(nn.Module):
-    def __init__(self, num_sensors, hidden_units,num_layers):
+    def __init__(self, num_sensors, hidden_units, num_layers):
         super().__init__()
         self.num_sensors = num_sensors  # this is the number of features
         self.hidden_units = hidden_units

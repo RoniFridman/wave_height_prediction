@@ -53,8 +53,9 @@ def train_test_split(data, ratio=0.7, test_start_ts=None):
     return df_train, df_test
 
 
-def configure_new_model(features, learning_rate, num_hidden_units, num_layers):
-    model = ShallowRegressionLSTM(num_sensors=len(features), hidden_units=num_hidden_units, num_layers=num_layers)
+def configure_new_model(features, learning_rate, num_hidden_units, num_layers, dropout):
+    model = ShallowRegressionLSTM(num_sensors=len(features), hidden_units=num_hidden_units, num_layers=num_layers,
+                                  dropout=dropout)
     loss_function = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     return model, loss_function, optimizer

@@ -4,7 +4,7 @@ import torch
 
 
 class ShallowRegressionLSTM(nn.Module):
-    def __init__(self, num_sensors, hidden_units, num_layers):
+    def __init__(self, num_sensors, hidden_units, num_layers, dropout):
         super().__init__()
         self.num_sensors = num_sensors  # this is the number of features
         self.hidden_units = hidden_units
@@ -15,7 +15,7 @@ class ShallowRegressionLSTM(nn.Module):
             hidden_size=hidden_units,
             batch_first=True,
             num_layers=self.num_layers,
-            # dropout=0.2
+            dropout=dropout
         )
 
         self.linear = nn.Linear(in_features=self.hidden_units, out_features=1)

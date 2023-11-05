@@ -2,18 +2,15 @@ from LSTMDataManager import LSTMDataManager
 import sys
 from utils import update_latest_data_from_db
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 if __name__ == "__main__":
-    location, target_variable, function = sys.argv[1], sys.argv[2], sys.argv[3]
-    # target_variable = 'hs'
-    # location = 'haifa'
-    # function = 'build_new_model'
-
-
-    # base_location_folder = "/data/scripts/waves_height_prediction"
-    base_location_folder = "."
-
-    full_data_path = os.path.join(base_location_folder,'datasets','cameri_buoy_data','haifa.csv')
+    function = sys.argv[1]
+    location, target_variable = os.getenv("LOCATION"), os.getenv("TARGET_VARIABLE")
+    base_location_folder = os.getenv("BASE_PROJECT_FOLDER")
+    os.makedirs(os.path.join(base_location_folder,"text_outputs"), exist_ok=True)
+    full_data_path = os.path.join(base_location_folder,'datasets','cameri_buoy_data',f'{location}.csv')
     lstm_data_manager = LSTMDataManager(full_data_path,location,target_variable, base_location_folder)
     if function == 'build_new_model':
         lstm_data_manager.build_new_model()

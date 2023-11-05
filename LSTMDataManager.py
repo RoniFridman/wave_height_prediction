@@ -17,7 +17,7 @@ torch.manual_seed(int(os.getenv("TORCH_SEED")))
 
 
 class LSTMDataManager:
-    def __init__(self, full_data_path, location, target_variable, base_location_folder):
+    def __init__(self, full_data_path,wind_data_path, location, target_variable, base_location_folder):
         # forward time to predict
         self.target_variable = os.getenv("TARGET_VARIABLE")
         self.forecast_lead_hours = int(os.getenv("FORECAST_LEAD_HOURS"))
@@ -25,6 +25,7 @@ class LSTMDataManager:
 
         # paths for running on db77
         self.full_data_path = full_data_path
+        self.wind_data_path = wind_data_path
         self.output_path = base_location_folder + f"/outputs/{location}_{self.forecast_lead_hours}h_{target_variable}_forecast"
         self.images_output_path = os.path.join(self.output_path, "images")
         self.csv_output_path = os.path.join(self.output_path, "csv files")
@@ -75,7 +76,7 @@ class LSTMDataManager:
         print(f"###########\t\tCreating model for forecast lead:  {self.forecast_lead_hours} hours")
 
         forecast_lead = self.forecast_lead_hours * 2  # Since rows are for each 30 min, not 1 hour.
-        self.full_data_df = create_short_data_csv(self.full_data_path, self.new_data_training_path,
+        self.full_data_df = create_short_data_csv(self.full_data_path,self.wind_data_path, self.new_data_training_path,
                                                   self.forecast_groundtruth, forecast_lead,
                                                   self.seq_length, years_of_data_to_use=self.years_of_data_to_use)
         full_data_df, self.features, new_target = load_data(data=self.full_data_df,
@@ -157,7 +158,6 @@ class LSTMDataManager:
         new_loader = DataLoader(new_dataset, batch_size=self.batch_size, shuffle=False)
 
         predictions_column_name = 'Model Prediction'
-        prediction_df[predictions_column_name] = self.model.predict(new_loader)
         prediction_df[predictions_column_name] = train_seq_dataset.invert_normalization(self.model.predict(new_loader), column=self.target_variable)
         prediction_df[self.target_variable] = train_seq_dataset.invert_normalization(prediction_df[self.target_variable], column=self.target_variable)
         prediction_df = prediction_df.loc[:, [self.target_variable, predictions_column_name]]

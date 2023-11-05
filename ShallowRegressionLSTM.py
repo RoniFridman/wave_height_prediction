@@ -26,7 +26,7 @@ class ShallowRegressionLSTM(nn.Module):
         c0 = torch.zeros(self.num_layers, batch_size, self.hidden_units).requires_grad_()
 
         if 'nan' in [str(float(i)) for i in x.flatten() if str(float(i)) == 'nan']:
-            print("ad")
+            print("detected nan in ShallowRegressionLSTM.forward - printing inputs vector:")
             print(x)
 
         ii, (hn, _) = self.lstm(x, (h0, c0))
@@ -48,7 +48,8 @@ class ShallowRegressionLSTM(nn.Module):
             optimizer.step()
             total_loss += loss.item()
             if str(total_loss) == 'nan':
-                break
+                print("detected nan in ShallowRegressionLSTM.train_epoch")
+
         avg_loss = total_loss / num_batches
         print(f"Train loss: {avg_loss}")
         return self, avg_loss

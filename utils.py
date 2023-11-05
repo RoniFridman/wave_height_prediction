@@ -12,12 +12,10 @@ load_dotenv()
 def load_data(data, features_mask='all', forecast_lead=4, target_variable='hs', new_data=False):
     if isinstance(data, str):
         data = pd.read_csv(data, index_col='datetime')
-    if "id" in data.columns:
-        data.drop(columns=["id"], inplace=True)
-    if "location_id" in data.columns:
-        data.drop(columns=["location_id"],inplace=True)
     data['direction_x'] = data['direction'].apply(lambda x: np.cos(x / 360))
     data['direction_y'] = data['direction'].apply(lambda x: np.sin(x / 360))
+    data['wind_direction_x'] = data['wind_direction'].apply(lambda x: np.cos(x / 360))
+    data['wind_direction_y'] = data['wind_direction'].apply(lambda x: np.sin(x / 360))
     data.drop(columns=['direction'], inplace=True)
     if features_mask != 'all':
         features_mask = list(features_mask) + [target_variable]
@@ -61,17 +59,25 @@ def configure_new_model(features, learning_rate, num_hidden_units, num_layers, d
     return model, loss_function, optimizer
 
 
-def create_short_data_csv(full_csv_path, new_data_training_path, empirical_test_data_path,
+def create_short_data_csv(full_csv_path,wind_data_path, new_data_training_path, empirical_test_data_path,
                           forecast, seq_number, predict_latest=False, years_of_data_to_use=3):
+    wind_data = pd.read_csv(wind_data_path, index_col='datetime')
+    wind_data.index = pd.to_datetime(wind_data.index,utc=True)
+    wind_data = wind_data.resample('30min').mean()
     if predict_latest:
         data = pd.read_csv(full_csv_path).set_index('datetime').iloc[-1 * forecast * seq_number:]
+        data.index = pd.to_datetime(data.index)
+        data = pd.DataFrame.join(data, wind_data,on='datetime', how='left')
         return data
     cutoff_index= round(-17520 * years_of_data_to_use)
-    data = pd.read_csv(full_csv_path).set_index('datetime').iloc[cutoff_index:]
+    data = pd.read_csv(full_csv_path,index_col='datetime').iloc[cutoff_index:]
+    data.index = pd.to_datetime(data.index)
+    data = pd.DataFrame.join(data, wind_data, on='datetime', how='left')
     data[-1 * forecast * seq_number:-1 * forecast].to_csv(new_data_training_path)
     data[-1 * forecast:].to_csv(empirical_test_data_path)
     data = data.iloc[:-1 * forecast]
     return data
+
 
 def upload_predictions_to_db(predictions_df: pd.DataFrame, location='haifa',target_variable='hs'):
     """
@@ -111,22 +117,30 @@ def update_latest_data_from_db(full_data_path, location='haifa'):
     try:
         if os.path.exists(full_data_path):
             os.remove(full_data_path)
-
+        location_id = {'haifa':1, "ashdod":2}
         connection = psycopg2.connect(user=os.getenv('db_user'),
                                       password=os.getenv('db_password'),
                                       host=os.getenv('db_host'),
                                       port=os.getenv('db_port'),
                                       database=os.getenv('db_name'))
-        location_id = {'haifa':1, "ashdod":2}
-
-        command = f"COPY (select datetime,hs,direction,tz,tp,temperature,h_onethird,hmax,tav " \
-                  f"from backend_buoysmsr where location_id = {location_id[location]} order by datetime) " \
-                  f"to STDOUT with CSV delimiter ',' header"
-
         cursor = connection.cursor()
+
+        waves_data_table_name = "backend_buoysmsr"
+        command = f"COPY (select datetime,hs,direction,tz,tp,temperature,h_onethird,hmax,tav from {waves_data_table_name} where location_id = {location_id[location]} order by datetime) " \
+                  f"to STDOUT with CSV delimiter ',' header"
         command = cursor.mogrify(command)
         connection.commit()
         with open(full_data_path,"w+") as file:
+            cursor.copy_expert(command, file)
+            file.close()
+
+        wind_data_table_name = "wind_data.wind_10min"
+        command = f"COPY (select datetime_utc as datetime ,wind_speed, wind_direction from {wind_data_table_name} where location = {location_id[location]} order by datetime) " \
+                  f"to STDOUT with CSV delimiter ',' header"
+        command = cursor.mogrify(command)
+        connection.commit()
+        wind_csv_output_path = full_data_path[:-4]+"_wind.csv"
+        with open(wind_csv_output_path, "w+") as file:
             cursor.copy_expert(command, file)
             file.close()
 

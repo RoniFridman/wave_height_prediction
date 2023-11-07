@@ -28,12 +28,13 @@ def load_data(data, features_mask='all', forecast_lead=4, target_variable='hs', 
         data = data.iloc[:-forecast_lead]
     else:
         data[new_target_col_name] = data[target_variable].shift(-forecast_lead)
-
     for column in features + [new_target_col_name]:
-        iqr = scipy.stats.iqr(data[column], nan_policy='omit')
-        q1, q3 = np.quantile(data[column], 0.25), np.quantile(data[column], 0.75)
-        lb, ub = q1 - 2 * iqr, q3 + 2 * iqr
-        data.loc[(data[column] < lb) | (data[column] > ub), column] = np.nan
+        # Cleaning outliers except for the target variable.
+        if target_variable not in column:
+            iqr = scipy.stats.iqr(data[column], nan_policy='omit')
+            q1, q3 = np.quantile(data[column], 0.25), np.quantile(data[column], 0.75)
+            lb, ub = q1 - 2 * iqr, q3 + 2 * iqr
+            data.loc[(data[column] < lb) | (data[column] > ub), column] = np.nan
         data[column].interpolate(inplace=True)
         data[column].fillna(method='bfill', inplace=True)
     return data, features, new_target_col_name
@@ -51,10 +52,10 @@ def train_test_split(data, ratio=0.7, test_start_ts=None):
     return df_train, df_test
 
 
-def configure_new_model(features, learning_rate, num_hidden_units, num_layers, dropout):
+def configure_new_model(features, learning_rate, num_hidden_units, num_layers, dropout,target):
     model = ShallowRegressionLSTM(num_sensors=len(features), hidden_units=num_hidden_units, num_layers=num_layers,
                                   dropout=dropout)
-    loss_function = nn.MSELoss()
+    loss_function = nn.L1Loss() if target == 'tp' else nn.MSELoss() # L1Loss or MSELoss
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     return model, loss_function, optimizer
 
@@ -115,8 +116,6 @@ def update_latest_data_from_db(full_data_path, location='haifa'):
     order in table should be: datetime, location, target variable predicted value
     """
     try:
-        if os.path.exists(full_data_path):
-            os.remove(full_data_path)
         location_id = {'haifa':1, "ashdod":2}
         connection = psycopg2.connect(user=os.getenv('db_user'),
                                       password=os.getenv('db_password'),

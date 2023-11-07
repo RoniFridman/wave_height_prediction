@@ -29,7 +29,7 @@ class ShallowRegressionLSTM(nn.Module):
             print("detected nan in ShallowRegressionLSTM.forward - printing inputs vector:")
             print(x)
 
-        ii, (hn, _) = self.lstm(x, (h0, c0))
+        _, (hn, _) = self.lstm(x, (h0, c0))
         out = self.linear(hn[0]).flatten()  # First dim of Hn is num_layers, which is set to 1 above.
 
         return out

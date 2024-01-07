@@ -19,9 +19,9 @@ torch.manual_seed(int(os.getenv("TORCH_SEED")))
 class LSTMDataManager:
     def __init__(self, full_data_path,wind_data_path, location, target_variable, base_location_folder):
         # forward time to predict
-        self.target_variable = os.getenv("TARGET_VARIABLE")
+        self.target_variable = target_variable
         self.forecast_lead_hours = int(os.getenv("FORECAST_LEAD_HOURS"))
-        self.location = os.getenv("LOCATION")
+        self.location = location
 
         # paths for running on db77
         self.full_data_path = full_data_path
@@ -105,7 +105,7 @@ class LSTMDataManager:
                                                                              self.dropout, self.target_variable)
         self.train_lstm()
 
-    def predict_latest_available_data(self, location):
+    def predict_latest_available_data(self):
         if None in [self.model, self.train_loader, self.test_loader, self.train_eval_loader]:
             print("ERROR: one of the files was not found. exiting")
             print(f"model={self.model}\ntrain_loader={self.train_loader}\ntest_loader={self.test_loader}\n"
@@ -149,7 +149,7 @@ class LSTMDataManager:
         predicted_values_only.to_csv(
             f"{self.csv_output_path}/forcast_{self.forecast_lead_hours}h_start_time_{forcast_start_datetime_string}.csv",
             index=False)
-        utils.upload_predictions_to_db(predicted_values_only.values, location=location,
+        utils.upload_predictions_to_db(predicted_values_only.values, location=self.location,
                                        target_variable=self.target_variable)
 
     def predict_on_new_data_csv(self, data_to_predict_csv_path):

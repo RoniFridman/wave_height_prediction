@@ -116,7 +116,7 @@ class LSTMDataManager:
         train_seq_dataset = self.train_loader.dataset
         normalization_dicts = train_seq_dataset.get_normalization_dicts()
         self.features = train_seq_dataset.features
-        new_data_df = create_short_data_csv(self.full_data_path, self.wind_data_path,
+        new_data_df = create_short_data_csv(self.full_data_path, self.wind_data_path,self.swell_data_path,
                                             self.new_data_training_path, self.forecast_groundtruth, self.forecast_lead_hours * 2,
                                             self.seq_length, predict_latest=True)
         prediction_df, _, new_target = load_data(data=new_data_df,

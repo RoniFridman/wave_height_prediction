@@ -12,14 +12,18 @@ load_dotenv()
 def load_data(data, features_mask='all', forecast_lead=4, target_variable='hs', new_data=False):
     if isinstance(data, str):
         data = pd.read_csv(data, index_col='datetime')
+    # Transform degrees using sin/cos
     data['direction_x'] = data['direction'].apply(lambda x: np.cos(x / 360))
     data['direction_y'] = data['direction'].apply(lambda x: np.sin(x / 360))
     data['wind_direction_x'] = data['wind_direction'].apply(lambda x: np.cos(x / 360))
     data['wind_direction_y'] = data['wind_direction'].apply(lambda x: np.sin(x / 360))
     data.drop(columns=['direction'], inplace=True)
+
+    # Do we want all features or filtering some of them. Default is "all".
     if features_mask != 'all':
         features_mask = list(features_mask) + [target_variable]
         data = data.loc[:, features_mask]
+    # Notice that the target variable is also a feature now.
     features = list(data.columns.difference([target_variable]))
     new_target_col_name = f"{target_variable}_lead{forecast_lead}"
 
@@ -28,13 +32,16 @@ def load_data(data, features_mask='all', forecast_lead=4, target_variable='hs', 
         data = data.iloc[:-forecast_lead]
     else:
         data[new_target_col_name] = data[target_variable].shift(-forecast_lead)
+
+    features_excluded_from_cleaning = [""]
     for column in features + [new_target_col_name]:
         # Cleaning outliers except for the target variable.
-        if target_variable not in column:
-            iqr = scipy.stats.iqr(data[column], nan_policy='omit')
-            q1, q3 = np.quantile(data[column], 0.25), np.quantile(data[column], 0.75)
-            lb, ub = q1 - 2 * iqr, q3 + 2 * iqr
-            data.loc[(data[column] < lb) | (data[column] > ub), column] = np.nan
+        # if target_variable in column or column in features_excluded_from_cleaning:
+        #     continue
+        # iqr = scipy.stats.iqr(data[column], nan_policy='omit')
+        # q1, q3 = np.quantile(data[column], 0.25), np.quantile(data[column], 0.75)
+        # lb, ub = q1 - 2 * iqr, q3 + 2 * iqr
+        # data.loc[(data[column] < lb) | (data[column] > ub), column] = np.nan
         data[column].interpolate(inplace=True)
         data[column].fillna(method='bfill', inplace=True)
     return data, features, new_target_col_name
@@ -60,15 +67,17 @@ def configure_new_model(features, learning_rate, num_hidden_units, num_layers, d
     return model, loss_function, optimizer
 
 
-def create_short_data_csv(full_csv_path,wind_data_path, new_data_training_path, empirical_test_data_path,
+def create_short_data_csv(full_csv_path,wind_data_path,swell_data_path, new_data_training_path, empirical_test_data_path,
                           forecast, seq_number, predict_latest=False, years_of_data_to_use=3):
     wind_data = pd.read_csv(wind_data_path, index_col='datetime')
     wind_data.index = pd.to_datetime(wind_data.index,utc=True)
     wind_data = wind_data.resample('30min').mean()
+    swell_data = pd.read_csv(swell_data_path, index_col='datetime')
+
     if predict_latest:
         data = pd.read_csv(full_csv_path).set_index('datetime').iloc[-1 * forecast * seq_number:]
         data.index = pd.to_datetime(data.index)
-        data = pd.DataFrame.join(data, wind_data,on='datetime', how='left')
+        data = pd.DataFrame.join(data, wind_data,on='datetime', how='left').join(other=swell_data,on='datetime', how='left')
         return data
     cutoff_index= round(-17520 * years_of_data_to_use)
     data = pd.read_csv(full_csv_path,index_col='datetime').iloc[cutoff_index:]
@@ -139,6 +148,16 @@ def update_latest_data_from_db(full_data_path, location='haifa'):
         command = cursor.mogrify(command)
         connection.commit()
         wind_csv_output_path = full_data_path[:-4]+"_wind.csv"
+        with open(wind_csv_output_path, "w+") as file:
+            cursor.copy_expert(command, file)
+            file.close()
+
+        swell_data_table_name = "waves_data.swell"
+        command = f"COPY (select datetime, hs_swell from {wind_data_table_name} where location = {location} order by datetime) " \
+                  f"to STDOUT with CSV delimiter ',' header"
+        command = cursor.mogrify(command)
+        connection.commit()
+        wind_csv_output_path = full_data_path[:-4] + "_swell.csv"
         with open(wind_csv_output_path, "w+") as file:
             cursor.copy_expert(command, file)
             file.close()

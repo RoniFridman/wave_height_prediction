@@ -13,7 +13,7 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(base_location_folder, "text_outputs"), exist_ok=True)
     full_data_path = os.path.join(base_location_folder, 'datasets', 'cameri_buoy_data', f'{location}.csv')
     wind_data_path = os.path.join(base_location_folder, 'datasets', 'cameri_buoy_data', f'{location}_wind.csv')
-    lstm_data_manager = LSTMDataManager(full_data_path, wind_data_path, location, target_variable, base_location_folder)
+    lstm_data_manager = LSTMDataManager(location, target_variable, base_location_folder)
     functions_dictionary = {'build': lstm_data_manager.build_new_model,
                             'predict': lstm_data_manager.predict_latest_available_data,
                             'upload':update_latest_data_from_db(full_data_path)}

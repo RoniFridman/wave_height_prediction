@@ -11,21 +11,21 @@ import tqdm
 from utils import *
 from matplotlib import pyplot as plt
 
-load_dotenv()
-
 torch.manual_seed(int(os.getenv("TORCH_SEED")))
 
 
 class LSTMDataManager:
-    def __init__(self, full_data_path,wind_data_path, location, target_variable, base_location_folder):
+    def __init__(self, location, target_variable, base_location_folder):
+        load_dotenv(override=True)
         # forward time to predict
         self.target_variable = target_variable
         self.forecast_lead_hours = int(os.getenv("FORECAST_LEAD_HOURS"))
         self.location = location
 
         # paths for running on db77
-        self.full_data_path = full_data_path
-        self.wind_data_path = wind_data_path
+        self.full_data_path = os.path.join(base_location_folder,"datasets",'cameri_buoy_data',f"{location}.csv")
+        self.wind_data_path = os.path.join(base_location_folder,"datasets",'cameri_buoy_data',f"{location}_wind.csv")
+        self.swell_data_path = os.path.join(base_location_folder,"datasets",'cameri_buoy_data',f"{location}_swell.csv")
         self.output_path = base_location_folder + f"/outputs/{location}_{self.forecast_lead_hours}h_{target_variable}_forecast"
         self.images_output_path = os.path.join(self.output_path, "images")
         self.csv_output_path = os.path.join(self.output_path, "csv files")
@@ -76,7 +76,7 @@ class LSTMDataManager:
         print(f"###########\t\tCreating model for forecast lead:  {self.forecast_lead_hours} hours")
 
         forecast_lead = self.forecast_lead_hours * 2  # Since rows are for each 30 min, not 1 hour.
-        self.full_data_df = create_short_data_csv(self.full_data_path,self.wind_data_path, self.new_data_training_path,
+        self.full_data_df = create_short_data_csv(self.full_data_path,self.wind_data_path,self.swell_data_path, self.new_data_training_path,
                                                   self.forecast_groundtruth, forecast_lead,
                                                   self.seq_length, years_of_data_to_use=self.years_of_data_to_use)
         full_data_df, self.features, new_target = load_data(data=self.full_data_df,
@@ -103,7 +103,7 @@ class LSTMDataManager:
         self.model, self.loss_function, self.optimizer = configure_new_model(self.features, self.learning_rate,
                                                                              self.num_hidden_units, self.num_layers,
                                                                              self.dropout, self.target_variable)
-        self.train_lstm()
+        return self.train_lstm()
 
     def predict_latest_available_data(self):
         if None in [self.model, self.train_loader, self.test_loader, self.train_eval_loader]:
@@ -226,3 +226,4 @@ class LSTMDataManager:
         plt.close()
         print(f"Train loss:\n{train_loss}")
         print(f"Test loss:\n{test_loss}")
+        return train_loss, test_loss

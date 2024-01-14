@@ -2,17 +2,19 @@
 import itertools
 import os, pathlib, sys
 from LSTMDataManager import LSTMDataManager
-from dotenv import load_dotenv,find_dotenv
+from dotenv import load_dotenv
 import time
 import shutil
+
+
 # parameters = {'NUM_HIDDEN_UNITS':[3], 'LEARNING_RATE':[0.1,0.01],
 #               "BATCH_SIZE":[50],"SEQ_LENGTH_DIVIDER":[1],
 #               "YEARS_TO_USE":[1], "TRAIN_TEST_RATION":[0.1,0.2]}
 
 
-parameters = {'NUM_HIDDEN_UNITS':[8,16,32,64,128], 'LEARNING_RATE':[0.1,0.01,0.001,0.0001],
-              "BATCH_SIZE":[50,1,30,10],"SEQ_LENGTH_DIVIDER":[0.1,2,0.2,0.5,1],
-              "YEARS_TO_USE":[1], "TRAIN_TEST_RATION":[0.1,0.2]}
+parameters = {'NUM_HIDDEN_UNITS':[32,64,128], 'LEARNING_RATE':[0.1,0.01,0.001],
+              "BATCH_SIZE":[50,1,30,5],"SEQ_LENGTH_DIVIDER":[2,0.2,1],
+              "YEARS_TO_USE":[1], "TRAIN_TEST_RATION":[0.2]}
 py_file_path, function, location, target_variable = sys.argv[0], sys.argv[1], sys.argv[2], sys.argv[3]
 base_location_folder = str(pathlib.Path(sys.argv[0]).parent)
 

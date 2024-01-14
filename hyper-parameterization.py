@@ -13,7 +13,7 @@ import shutil
 
 
 parameters = {'NUM_HIDDEN_UNITS':[32,64,128], 'LEARNING_RATE':[0.1,0.01,0.001],
-              "BATCH_SIZE":[50,1,30,5],"SEQ_LENGTH_DIVIDER":[2,0.2,1],
+              "BATCH_SIZE":[50,1,30,5],"SEQ_LENGTH_DIVIDER":[2,0.2,1], "WEIGHT_DECAY":[0.95],
               "YEARS_TO_USE":[1], "TRAIN_TEST_RATION":[0.2]}
 py_file_path, function, location, target_variable = sys.argv[0], sys.argv[1], sys.argv[2], sys.argv[3]
 base_location_folder = str(pathlib.Path(sys.argv[0]).parent)
@@ -39,7 +39,7 @@ for i,params in enumerate(set_of_parameters):
         f.write(f"TORCH_SEED=422\nNORMALIZATION_METHOD=mean_std  # min_max. any other method is mean-std.\n\n\n")
         f.write(f"# Model Parameters\nNUM_LAYERS=1\nNUM_HIDDEN_UNITS={params[0]}\nLEARNING_RATE={params[1]}\n")
         f.write(f"DROPOUT=0\nBATCH_SIZE={params[2]}\nEPOCHS=20\nSEQ_LENGTH_DIVIDER={params[3]}  # sequence_length = (forecast_hours * 2) // divider\n")
-        f.write(f"WEIGHT_DECAY=0.1")
+        f.write(f"WEIGHT_DECAY={params[4]}")
 
         f.close()
     load_dotenv(override=True)

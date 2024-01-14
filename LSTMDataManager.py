@@ -50,6 +50,7 @@ class LSTMDataManager:
         self.batch_size = int(os.getenv("BATCH_SIZE"))
         self.dropout = float(os.getenv("DROPOUT"))
         self.normalization_method = os.getenv("NORMALIZATION_METHOD")
+        self.weight_decay = os.getenv("WEIGHT_DECAY")
 
         self.seq_length = round(self.forecast_lead_hours // float(os.getenv("SEQ_LENGTH_DIVIDER")))
         self.loss_function = None
@@ -102,7 +103,8 @@ class LSTMDataManager:
         # train model
         self.model, self.loss_function, self.optimizer = configure_new_model(self.features, self.learning_rate,
                                                                              self.num_hidden_units, self.num_layers,
-                                                                             self.dropout, self.target_variable)
+                                                                             self.dropout, self.target_variable,
+                                                                             self.weight_decay)
         return self.train_lstm()
 
     def predict_latest_available_data(self):

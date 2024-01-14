@@ -59,11 +59,11 @@ def train_test_split(data, ratio=0.7, test_start_ts=None):
     return df_train, df_test
 
 
-def configure_new_model(features, learning_rate, num_hidden_units, num_layers, dropout,target):
+def configure_new_model(features, learning_rate, num_hidden_units, num_layers, dropout,weight_decay,target):
     model = ShallowRegressionLSTM(num_sensors=len(features), hidden_units=num_hidden_units, num_layers=num_layers,
                                   dropout=dropout)
     loss_function = nn.L1Loss() if target == 'tp' else nn.MSELoss() # L1Loss or MSELoss
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay=weight_decay)
     return model, loss_function, optimizer
 
 

@@ -38,7 +38,9 @@ for i,params in enumerate(set_of_parameters):
         f.write(f"# Data parameters\nYEARS_TO_USE={params[4]}\nTRAIN_TEST_RATIO={params[5]}\n\n")
         f.write(f"TORCH_SEED=422\nNORMALIZATION_METHOD=mean_std  # min_max. any other method is mean-std.\n\n\n")
         f.write(f"# Model Parameters\nNUM_LAYERS=1\nNUM_HIDDEN_UNITS={params[0]}\nLEARNING_RATE={params[1]}\n")
-        f.write(f"DROPOUT=0\nBATCH_SIZE={params[2]}\nEPOCHS=20\nSEQ_LENGTH_DIVIDER={params[3]}  # sequence_length = (forecast_hours * 2) // divider")
+        f.write(f"DROPOUT=0\nBATCH_SIZE={params[2]}\nEPOCHS=20\nSEQ_LENGTH_DIVIDER={params[3]}  # sequence_length = (forecast_hours * 2) // divider\n")
+        f.write(f"WEIGHT_DECAY=0.1")
+
         f.close()
     load_dotenv(override=True)
     time.sleep(3)
